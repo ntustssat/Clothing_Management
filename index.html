@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>實驗室衣架</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 每款衣服一條橫桿，衣服掛成一直線；點衣服從底部拉出紀錄卡與借還表單 */
+:root{
+  --bg:#eef1f0; --panel:#ffffff; --ink:#17201c; --muted:#5f6b66; --line:#cdd5d1;
+  --rail:#8a958f; --accent:#0e7c6b; --out:#d9822b; --out-soft:#fbe9d6; --keep:#3b6fd1; --keep-soft:#dfe8fb;
+  --tag:#fffdf7; --tag-ink:#17201c; --err:#c0392b;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121715; --panel:#1b2220; --ink:#e6ece9; --muted:#97a39e; --line:#2f3936;
+  --rail:#6d7873; --accent:#3cc2a8; --out:#f0a35a; --out-soft:#3a2a1a; --keep:#7ea2f0; --keep-soft:#1f2b45;
+  --tag:#f4f1e8; --tag-ink:#17201c; --err:#ff8a7a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --panel:#1b2220; --ink:#e6ece9; --muted:#97a39e; --line:#2f3936;
+  --rail:#6d7873; --accent:#3cc2a8; --out:#f0a35a; --out-soft:#3a2a1a; --keep:#7ea2f0; --keep-soft:#1f2b45;
+  --tag:#f4f1e8; --tag-ink:#17201c; --err:#ff8a7a; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 160px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+h1{font-size:26px;font-weight:900;margin:0;letter-spacing:.02em;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0}
+.sub.warn{color:var(--out)}
+.totals{display:flex;gap:18px;flex-wrap:wrap}
+.tot{display:flex;flex-direction:column}
+.tot b{font-family:var(--mono);font-size:24px;font-variant-numeric:tabular-nums;line-height:1.1}
+.tot span{font-size:12px;color:var(--muted);letter-spacing:.05em}
+.tot.in b{color:var(--accent)} .tot.out b{color:var(--out)} .tot.keep b{color:var(--keep)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.toolbar label.t{font-size:12px;color:var(--muted);letter-spacing:.06em;margin-right:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-family:var(--mono);font-size:13px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:3px 11px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip:focus-visible,.slot:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=search],input[type=text]{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 10px}
+input[type=search]{width:150px}
+.tools{margin-left:auto;display:flex;gap:8px;align-items:center}
+.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn.primary{background:var(--out);border-color:var(--out);color:#fff;font-weight:700}
+.btn.keep{background:var(--keep);border-color:var(--keep);color:#fff;font-weight:700}
+.btn.ret{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.btn:disabled{opacity:.5;cursor:wait}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.rack{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 0 10px}
+.rack-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;padding:0 16px 4px;align-items:baseline}
+.rack-head h2{margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sw{width:14px;height:14px;border-radius:3px;border:1px solid var(--line)}
+.kind{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 6px;font-weight:500}
+.stats{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stats b{font-family:var(--mono);color:var(--ink)}
+.stats .hit{color:var(--accent);font-weight:700}
+.scroller{overflow-x:auto;padding:0 16px 4px}
+.line{position:relative;display:flex;gap:2px;width:max-content;padding-top:6px}
+.line::before{content:"";position:absolute;left:-8px;right:-8px;top:8px;height:4px;border-radius:2px;background:var(--rail)}
+.slot{position:relative;width:58px;flex:none;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit;transition:transform .15s, opacity .15s}
+.slot:hover{transform:translateY(3px) rotate(-1.5deg)}
+.slot svg{display:block;width:58px;height:78px}
+.slot .num{display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:1px}
+.slot .sz{position:absolute;left:0;right:0;top:44px;text-align:center;font-family:var(--mono);font-weight:600;font-size:13px}
+.slot .tg{position:absolute;left:4px;right:4px;top:36px;background:var(--tag);color:var(--tag-ink);border-radius:4px;padding:2px 1px 1px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.25);border-top:3px solid var(--out)}
+.slot.keep .tg{border-top-color:var(--keep)}
+.tg .nm{display:block;font-size:11px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg .s2{display:block;font-family:var(--mono);font-size:10px;color:#5f6b66;line-height:1.2}
+.slot.taken svg .body{opacity:.28}
+.slot.empty{cursor:default}
+.slot.empty:hover{transform:none}
+.slot.dim{opacity:.18}
+.slot.sel svg .body{stroke:var(--accent);stroke-width:2.5}
+
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.15);
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  transform:translateY(105%);transition:transform .22s ease;max-height:75vh;overflow:auto}
+.drawer.open{transform:none}
+.drawer .in{max-width:900px;margin:0 auto;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+.drawer .in > div{min-width:0}
+.drawer .big svg{width:84px;height:112px}
+.drawer h3{margin:0 0 4px;font-size:18px;padding-right:70px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px 16px;margin:8px 0}
+.kv div{display:flex;flex-direction:column}
+.kv span,.lbl{font-size:11px;color:var(--muted);letter-spacing:.06em}
+.kv b{font-size:15px}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 10px}
+.pill.in{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.pill.out{background:var(--out-soft);color:var(--out)}
+.pill.keep{background:var(--keep-soft);color:var(--keep)}
+form.act{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+form.act label{display:flex;flex-direction:column;gap:3px}
+form.act input{background:var(--panel)}
+form.act .row{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.msg{font-size:13px}
+.msg.err{color:var(--err)}
+.hist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.hist li{display:flex;gap:10px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:4px}
+.hist .t{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.hist .a{font-weight:700}
+.close{position:absolute;top:10px;right:max(16px,env(safe-area-inset-right,0px))}
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-weight:700;z-index:30}
+
+section.log{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+section.log h2{margin:0 0 8px;font-size:17px}
+.tbl{overflow-x:auto;max-height:420px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:620px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.05em;position:sticky;top:0;background:var(--panel)}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.note{color:var(--muted);font-size:12px;margin:8px 0 0}
+@media (max-width:560px){.tools{margin-left:0}.drawer .in{grid-template-columns:1fr}.drawer .big{display:none}}
+@media (prefers-reduced-motion:reduce){.slot,.drawer{transition:none}.slot:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>實驗室衣架</h1>
+      <p class="sub" id="src">讀取資料中…</p>
+    </div>
+    <div class="totals" id="totals"></div>
+  </header>
+
+  <div class="toolbar">
+    <div class="chips" id="sizes"></div>
+    <div><label class="t" for="q">找人</label><input type="search" id="q" placeholder="姓名，例如 YJ"></div>
+    <div class="legend">
+      <span><i style="background:var(--out)"></i>借出</span>
+      <span><i style="background:var(--keep)"></i>老師留</span>
+      <span><i style="border:1px dashed var(--muted)"></i>未登記空位</span>
+    </div>
+    <div class="tools"><button class="btn" id="theme" aria-label="切換配色">配色：跟隨系統</button><button class="btn" id="reload">重新整理</button></div>
+  </div>
+
+  <div id="racks" style="display:flex;flex-direction:column;gap:14px"></div>
+
+  <section class="log">
+    <h2>借還紀錄</h2>
+    <div class="tbl"><table id="logt"></table></div>
+    <p class="note">每件衣服的狀態以「紀錄」分頁裡它的最後一筆為準：借出、老師留，或歸還（回到架上）。</p>
+  </section>
+</div>
+
+<div class="drawer" id="drawer" aria-live="polite">
+  <button class="btn close" id="close">關閉</button>
+  <div class="in" id="dIn"></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<datalist id="acts"></datalist>
+
+<script>
+/* ===== 設定：把網址貼在這裡 ===== */
+// Apps Script 部署後的「網頁應用程式」網址（結尾是 /exec）。有這個就能即時讀取和寫入。
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmPCTrkoLIZYhAi1C2rzw1wCAHEh70-rvX5tg-luYA9cX3gxeiySsgmURMyrUcWdXOow/exec";
+// 備用：「庫存」「紀錄」兩個分頁各自「發布到網路」的 CSV 網址（Apps Script 讀不到時才用，會有幾分鐘快取）
+const INVENTORY_CSV = "";
+const LOG_CSV = "";
+// 每款的總數（決定虛線空位畫到幾號）
+const CAPACITY = {"DLIVE黑色防護":25,"DLIVE紅色防護":25,"DLIVE白色防護":25,"DLIVE黑色鐵人":25,"初布鐵人":25,"初布防護":16};
+/* ================================ */
+
+const LOOK = {
+  "DLIVE黑色防護":{fill:"#1d1f22",ink:"#ffffff",stroke:"#000",kind:"防護"},
+  "DLIVE紅色防護":{fill:"#d8352a",ink:"#ffffff",stroke:"#8f1f17",kind:"防護"},
+  "DLIVE白色防護":{fill:"#ffffff",ink:"#17201c",stroke:"#9aa5a0",kind:"防護"},
+  "DLIVE黑色鐵人":{fill:"#1d1f22",ink:"#ffffff",stroke:"#000",kind:"鐵人"},
+  "初布鐵人":{fill:"#1d1f22",ink:"#ffffff",stroke:"#000",kind:"鐵人"},
+  "初布防護":{fill:"#1d1f22",ink:"#ffffff",stroke:"#000",kind:"防護"}
+};
+const DEF = {fill:"#1d1f22",ink:"#ffffff",stroke:"#000",kind:"防護"};
+const SIZE_ORDER = ["S","M","L","XL","2L","2XL","3L","3XL"];
+const sizeRank = s => { const i = SIZE_ORDER.indexOf(s); return i < 0 ? 99 : i; };
+
+function parseCSV(t){
+  const rows=[]; let row=[], f="", q=false;
+  t = t.replace(/^﻿/,"");
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){f+='"';i++} else q=false } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){row.push(f);f=""}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&t[i+1]==='\n')i++; row.push(f);rows.push(row);row=[];f=""; }
+    else f+=c;
+  }
+  if(f!==""||row.length){row.push(f);rows.push(row)}
+  return rows;
+}
+
+// inventory: [[款式,編號,尺寸],...]  log: [[時間,動作,姓名,活動,款式,編號,備註],...]（都含標題列）
+function build(invRows, logRows){
+  const clean = r => r.map(v => String(v ?? "").trim());
+  const inv = invRows.slice(1).map(clean).filter(r => r[0] && +r[1] > 0);
+  const log = logRows.slice(1).map(clean).filter(r => r[1] && r[4] && +r[5] > 0)
+    .map(r => ({time:r[0], action:r[1], name:r[2], activity:r[3], series:r[4], num:+r[5], note:r[6]||""}));
+  const map = new Map();
+  for(const r of inv){
+    if(!map.has(r[0])) map.set(r[0], {name:r[0], cap:CAPACITY[r[0]]||0, items:[]});
+    map.get(r[0]).items.push({series:r[0], num:+r[1], size:r[2].toUpperCase(), status:"in", holder:"", activity:"", note:"", history:[]});
+  }
+  const find = (s,n) => map.get(s)?.items.find(i => i.num === n);
+  for(const r of log){
+    const it = find(r.series, r.num); if(!it) continue;
+    it.history.push(r);
+    if(r.action === "歸還"){ it.status="in"; it.holder=""; it.activity=""; it.note=""; }
+    else if(r.action === "借出" || r.action === "老師留"){
+      it.status = r.action === "借出" ? "out" : "keep";
+      it.holder = r.name; it.activity = r.activity; it.note = r.note;
+    }
+  }
+  const series = [...map.values()];
+  series.forEach(s => s.items.sort((a,b) => a.num - b.num));
+  return {series, log};
+}
+
+function shirt(look,{ghost=false}={}){
+  const tri = look.kind==="鐵人";
+  const body = tri
+    ? "M21 24 Q24 36 15 40 L16 74 L44 74 L45 40 Q36 36 39 24 Q30 30 21 24 Z"
+    : "M18 24 L6 32 L11 42 L17 39 L17 74 L43 74 L43 39 L49 42 L54 32 L42 24 Q30 32 18 24 Z";
+  const fill = ghost ? "none" : look.fill;
+  const st = ghost ? `stroke="currentColor" stroke-dasharray="3 3" opacity=".45"` : `stroke="${look.stroke}"`;
+  return `<svg viewBox="0 0 60 80" aria-hidden="true">
+    <path d="M30 6 q4 0 4 4 q0 3 -4 4 v4" fill="none" stroke="var(--rail)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M30 18 L9 26 L51 26 Z" fill="none" stroke="var(--rail)" stroke-width="2" stroke-linejoin="round"/>
+    <path class="body" d="${body}" fill="${fill}" ${st} stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+
+let DATA = null, sizeSel = "", nameQ = "", selKey = "", sending = false;
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function render(){
+  const all = DATA.series.flatMap(s=>s.items);
+  const cnt = st => all.filter(i=>i.status===st).length;
+  $("totals").innerHTML =
+    `<div class="tot in"><b>${cnt("in")}</b><span>在架</span></div>
+     <div class="tot out"><b>${cnt("out")}</b><span>借出</span></div>
+     <div class="tot keep"><b>${cnt("keep")}</b><span>老師留</span></div>
+     <div class="tot"><b>${all.length}</b><span>已登記</span></div>`;
+
+  const sizes = [...new Set(all.map(i=>i.size).filter(Boolean))].sort((a,b)=>sizeRank(a)-sizeRank(b));
+  $("sizes").innerHTML = `<label class="t">找尺寸</label>` +
+    ["全部",...sizes].map(s=>{const v=s==="全部"?"":s;return `<button class="chip" data-size="${esc(v)}" aria-pressed="${v===sizeSel}">${esc(s)}</button>`}).join("");
+
+  const q = nameQ.trim().toLowerCase();
+  $("racks").innerHTML = DATA.series.map((s,si)=>{
+    const look = LOOK[s.name]||DEF;
+    const n = st => s.items.filter(i=>i.status===st).length;
+    const hits = sizeSel ? s.items.filter(i=>i.status==="in"&&i.size===sizeSel).length : null;
+    const maxNum = Math.max(s.cap, ...s.items.map(i=>i.num));
+    let slots="";
+    for(let k=1;k<=maxNum;k++){
+      const it = s.items.find(i=>i.num===k);
+      if(!it){ slots+=`<div class="slot empty" title="${k} 號未登記">${shirt(look,{ghost:true})}<span class="num">${k}</span></div>`; continue; }
+      const key=si+"-"+k;
+      const dim = (sizeSel && !(it.status==="in"&&it.size===sizeSel)) || (q && !it.holder.toLowerCase().includes(q));
+      const cls=["slot",it.status!=="in"?"taken":"",it.status,dim?"dim":"",key===selKey?"sel":""].join(" ");
+      const label = it.status==="in"
+        ? `<span class="sz" style="color:${look.ink}">${esc(it.size)}</span>`
+        : `<span class="tg"><span class="nm">${esc(it.holder)}</span><span class="s2">${esc(it.size||"—")}</span></span>`;
+      const aria = `${s.name} ${k} 號，${it.size||"尺寸未知"}，${it.status==="in"?"在架":(it.status==="keep"?"老師留給 ":"借給 ")+it.holder}`;
+      slots+=`<button class="${cls}" data-key="${key}" aria-label="${esc(aria)}">${shirt(look)}${label}<span class="num">${k}</span></button>`;
+    }
+    return `<section class="rack">
+      <div class="rack-head">
+        <h2><span class="sw" style="background:${look.fill}"></span>${esc(s.name)}<span class="kind">${look.kind}</span></h2>
+        <div class="stats">在架 <b>${n("in")}</b> · 借出 <b>${n("out")}</b> · 老師留 <b>${n("keep")}</b> · 登記 <b>${s.items.length}</b>${s.cap?"/"+s.cap:""}${hits!==null?` · <span class="hit">${esc(sizeSel)} 可借 ${hits} 件</span>`:""}</div>
+      </div>
+      <div class="scroller"><div class="line">${slots}</div></div>
+    </section>`;
+  }).join("");
+
+  const pillFor = a => a==="歸還"?'<span class="pill in">歸還</span>':a==="老師留"?'<span class="pill keep">老師留</span>':'<span class="pill out">借出</span>';
+  $("logt").innerHTML =
+    `<thead><tr><th>時間</th><th>動作</th><th>姓名</th><th>活動</th><th>款式</th><th>編號</th><th>備註</th></tr></thead><tbody>` +
+    DATA.log.slice().reverse().map(r=>`<tr><td class="n">${esc(r.time)}</td><td>${pillFor(r.action)}</td><td>${esc(r.name)}</td><td>${esc(r.activity)}</td><td>${esc(r.series)}</td><td class="n">${r.num}</td><td>${esc(r.note)}</td></tr>`).join("") + `</tbody>`;
+
+  const acts = [...new Set(DATA.log.map(r=>r.activity).filter(Boolean))].reverse();
+  $("acts").innerHTML = acts.map(a=>`<option value="${esc(a)}"></option>`).join("");
+}
+
+function openDetail(key, msg){
+  const [si,n]=key.split("-").map(Number); const s=DATA.series[si]; const it=s?.items.find(i=>i.num===n); if(!it) return;
+  selKey=key; render();
+  const look=LOOK[s.name]||DEF;
+  const pill = it.status==="in"?'<span class="pill in">在架</span>':it.status==="out"?'<span class="pill out">借出中</span>':'<span class="pill keep">老師留</span>';
+  const canWrite = !!SCRIPT_URL;
+  let form;
+  if(!canWrite){
+    form = `<p class="note">還沒設定寫入網址（SCRIPT_URL），目前只能查看。</p>`;
+  } else if(it.status==="in"){
+    form = `<form class="act" id="actForm">
+      <label><span class="lbl">姓名</span><input type="text" id="fName" required autocomplete="off"></label>
+      <label><span class="lbl">活動</span><input type="text" id="fAct" list="acts" autocomplete="off" placeholder="例如 國科會"></label>
+      <label><span class="lbl">備註</span><input type="text" id="fNote" autocomplete="off"></label>
+      <div class="row"><button class="btn primary" type="submit" data-action="借出">登記借出</button>
+        <button class="btn keep" type="submit" data-action="老師留">登記老師留</button>
+        <span class="msg" id="fMsg"></span></div></form>`;
+  } else {
+    form = `<form class="act" id="actForm">
+      <label><span class="lbl">備註（選填）</span><input type="text" id="fNote" autocomplete="off" placeholder="例如 有洗過"></label>
+      <div class="row"><button class="btn ret" type="submit" data-action="歸還">${esc(it.holder)} 已歸還</button>
+        <span class="msg" id="fMsg"></span></div></form>`;
+  }
+  const hist = it.history.length
+    ? `<ul class="hist">${it.history.slice().reverse().map(h=>`<li><span class="t">${esc(h.time)}</span><span class="a">${esc(h.action)}</span><span>${esc(h.name)}</span><span>${esc(h.activity)}</span>${h.note?`<span>${esc(h.note)}</span>`:""}</li>`).join("")}</ul>`
+    : `<p class="note">這件還沒有借還紀錄。</p>`;
+  $("dIn").innerHTML = `<div class="big">${shirt(look)}</div>
+    <div><h3>${esc(s.name)} · ${n} 號</h3>${pill}
+      <div class="kv"><div><span>尺寸</span><b>${esc(it.size||"—")}</b></div>
+        <div><span>拿走的人</span><b>${esc(it.holder||"—")}</b></div>
+        <div><span>活動</span><b>${esc(it.activity||"—")}</b></div>
+        ${it.note?`<div><span>備註</span><b>${esc(it.note)}</b></div>`:""}</div>
+      ${form}
+      <div class="lbl">借還紀錄</div>${hist}</div>`;
+  $("drawer").classList.add("open");
+  if(msg){ const m=$("fMsg"); if(m){ m.textContent=msg; m.className="msg err"; } }
+
+  const f=$("actForm");
+  if(f) f.addEventListener("submit", e=>{
+    e.preventDefault();
+    const action = e.submitter?.dataset.action || (it.status==="in"?"借出":"歸還");
+    const name = it.status==="in" ? $("fName").value.trim() : it.holder;
+    if(!name){ $("fMsg").textContent="請填姓名"; $("fMsg").className="msg err"; return; }
+    submitRecord(key, {action, name, activity: it.status==="in" ? ($("fAct")?.value.trim()||"") : it.activity,
+      series:s.name, num:n, note:$("fNote")?.value.trim()||""});
+  });
+}
+
+async function submitRecord(key, rec){
+  if(sending) return; sending = true;
+  document.querySelectorAll("#actForm button").forEach(b=>b.disabled=true);
+  const m=$("fMsg"); m.textContent="送出中…"; m.className="msg";
+  try{
+    const res = await fetch(SCRIPT_URL, {method:"POST", body:JSON.stringify(rec)}); // text/plain，避免 CORS 預檢
+    const out = await res.json();
+    if(!out.ok) throw new Error(out.error||"寫入失敗");
+    const r = out.row;
+    DATA.log.push({time:r[0], action:r[1], name:r[2], activity:r[3], series:r[4], num:+r[5], note:r[6]||""});
+    DATA = rebuildFrom(DATA);
+    toast(`已記錄：${rec.series} ${rec.num} 號 ${rec.action}`);
+    openDetail(key);
+  }catch(err){
+    openDetail(key, "沒有寫進去：" + (err.message || "連不到 Apps Script") + "。請稍後再試，或確認 SCRIPT_URL。");
+  }finally{ sending = false; }
+}
+
+// 用目前的庫存與紀錄重算狀態
+let RAW_INV = null;
+function rebuildFrom(d){
+  const logRows = [["時間","動作","姓名","活動","款式","編號","備註"], ...d.log.map(r=>[r.time,r.action,r.name,r.activity,r.series,String(r.num),r.note])];
+  return build(RAW_INV, logRows);
+}
+
+function toast(t){ const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>el.hidden=true,2600); }
+const nowStr = () => new Date().toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false});
+
+async function load(){
+  const src=$("src"); src.className="sub"; src.textContent="讀取資料中…";
+  let inv=null, log=null, from="";
+  if(SCRIPT_URL){
+    try{ const r=await fetch(SCRIPT_URL+"?t="+Date.now()); const j=await r.json(); if(j.ok){ inv=j.inventory; log=j.log; from="Google Sheet 即時資料"; } }catch(e){}
+  }
+  if(!inv && INVENTORY_CSV && LOG_CSV){
+    try{
+      const [a,b] = await Promise.all([INVENTORY_CSV,LOG_CSV].map(u=>fetch(u+(u.includes("?")?"&":"?")+"t="+Date.now(),{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.text()})));
+      inv=parseCSV(a); log=parseCSV(b); from="Google Sheet 發布資料（可能慢幾分鐘）";
+    }catch(e){}
+  }
+  if(!inv){
+    src.className="sub warn";
+    src.textContent = SCRIPT_URL||INVENTORY_CSV ? "讀不到 Google Sheet · " + nowStr() : "還沒設定 Google Sheet 網址";
+    $("racks").innerHTML = `<section class="rack" style="padding:20px 16px"><b>目前沒有資料</b>
+      <p class="note">請確認：試算表有「庫存」和「紀錄」兩個分頁、Apps Script 已部署為「所有人」可存取，且 SCRIPT_URL 已填入網址。弄好之後按「重新整理」。</p></section>`;
+    $("totals").innerHTML=""; $("sizes").innerHTML=""; $("logt").innerHTML="";
+    return;
+  }
+  RAW_INV = inv;
+  DATA = build(inv, log);
+  const keepKey = selKey; selKey="";
+  render();
+  src.textContent = from + " · 讀取於 " + nowStr();
+  if(keepKey && $("drawer").classList.contains("open")) openDetail(keepKey);
+}
+
+document.addEventListener("click",e=>{
+  const chip=e.target.closest(".chip"); if(chip){ sizeSel=chip.dataset.size; render(); return; }
+  const sl=e.target.closest("button.slot"); if(sl){ openDetail(sl.dataset.key); return; }
+});
+$("close").onclick=()=>{$("drawer").classList.remove("open");selKey="";render();};
+$("q").addEventListener("input",e=>{nameQ=e.target.value;render();});
+$("reload").onclick=load;
+// 配色切換：跟隨系統 → 淺色 → 深色
+const THEMES=[["","跟隨系統"],["light","淺色"],["dark","深色"]];
+function applyTheme(v){
+  if(v) document.documentElement.setAttribute("data-theme",v); else document.documentElement.removeAttribute("data-theme");
+  $("theme").textContent="配色："+THEMES.find(t=>t[0]===v)[1];
+  try{ v ? localStorage.setItem("shirtTheme",v) : localStorage.removeItem("shirtTheme"); }catch(e){}
+}
+let themeNow=""; try{ themeNow=localStorage.getItem("shirtTheme")||""; }catch(e){}
+if(!THEMES.some(t=>t[0]===themeNow)) themeNow="";
+applyTheme(themeNow);
+$("theme").onclick=()=>{ const i=THEMES.findIndex(t=>t[0]===themeNow); themeNow=THEMES[(i+1)%3][0]; applyTheme(themeNow); };
+load();
+</script>
+</body>
+</html>
